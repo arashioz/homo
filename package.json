@@ -1,0 +1,51 @@
+{
+  "name": "homo",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "eslint",
+    "import:catalog": "python3 scripts/import-catalog.py",
+    "import:excel": "python3 scripts/import-excel-images.py",
+    "sync:saveria": "python3 scripts/sync-saveria.py sync",
+    "fix:images": "python3 scripts/sync-saveria.py fix",
+    "fix:watermarks": "python3 scripts/remove-watermarks.py",
+    "backend:dev": "npm run start:dev --workspace=@homo/backend",
+    "backend:build": "npm run build --workspace=@homo/backend",
+    "backend:seed": "npm run db:seed --workspace=@homo/backend",
+    "crm:frontend:dev": "npm run dev --workspace=@homo/crm-frontend",
+    "crm:frontend:build": "npm run build --workspace=@homo/crm-frontend",
+    "db:up": "docker compose -f infra/docker-compose.dev.yml up -d",
+    "db:down": "docker compose -f infra/docker-compose.dev.yml down",
+    "dev:all": "npm run db:up && concurrently -k -n \"BACKEND,FRONTEND,CRM\" -c \"blue.bold,green.bold,magenta.bold\" \"npm run backend:dev\" \"npm run dev\" \"npm run crm:frontend:dev\"",
+    "stack:up": "docker compose --env-file infra/.env -f infra/docker-compose.yml up --build -d",
+    "stack:down": "docker compose --env-file infra/.env -f infra/docker-compose.yml down",
+    "stack:logs": "docker compose --env-file infra/.env -f infra/docker-compose.yml logs -f"
+  },
+  "dependencies": {
+    "@fontsource/cormorant-garamond": "^5.3.0",
+    "@fontsource/vazirmatn": "^5.3.0",
+    "next": "16.3.0",
+    "pdf-parse": "^2.4.5",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/pdf-parse": "^1.1.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "concurrently": "^10.0.5",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.0",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

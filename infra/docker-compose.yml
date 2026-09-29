@@ -1,0 +1,161 @@
+services:
+  mongo:
+    image: mongo:8.0
+    container_name: homo-mongo
+    restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:?Set MONGO_ROOT_USERNAME in infra/.env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD in infra/.env}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:?Set MONGO_DATABASE in infra/.env}
+    volumes:
+      - homo_mongo_data:/data/db
+    ports:
+      - "${HOST_BIND_ADDRESS:-127.0.0.1}:${MONGO_PORT:-27017}:27017"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --username \"$${MONGO_INITDB_ROOT_USERNAME}\" --password \"$${MONGO_INITDB_ROOT_PASSWORD}\" --authenticationDatabase admin --eval 'db.adminCommand({ ping: 1 }).ok' | grep -q 1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 15s
+
+  # MongoDB transactions require a replica set, even for a one-node deployment.
+  # This service is idempotent: it initializes rs0 only on the first boot.
+  mongo-init:
+    image: mongo:8.0
+    container_name: homo-mongo-init
+    restart: "no"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:?Set MONGO_ROOT_USERNAME in infra/.env}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD in infra/.env}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        if mongosh --host mongo --quiet --username "$$MONGO_INITDB_ROOT_USERNAME" --password "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval 'rs.status().ok' >/dev/null 2>&1; then
+          echo "Replica set rs0 is already initialized."
+        else
+          mongosh --host mongo --quiet --username "$$MONGO_INITDB_ROOT_USERNAME" --password "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"mongo:27017"}]})'
+        fi
+        until mongosh --host mongo --quiet --username "$$MONGO_INITDB_ROOT_USERNAME" --password "$$MONGO_INITDB_ROOT_PASSWORD" --authenticationDatabase admin --eval 'db.hello().isWritablePrimary' | grep -q true; do
+          sleep 1
+        done
+
+  redis:
+    image: redis:7-alpine
+    container_name: homo-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - homo_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  crm-backend:
+    build:
+      context: ../backend
+    container_name: homo-crm-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      API_PREFIX: v1
+      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/${MONGO_DATABASE}?authSource=admin&replicaSet=rs0
+      CORS_ORIGINS: ${CRM_CORS_ORIGINS:?Set CRM_CORS_ORIGINS in infra/.env}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in infra/.env}
+      CRM_ADMIN_USERNAME: ${CRM_ADMIN_USERNAME:?Set CRM_ADMIN_USERNAME in infra/.env}
+      CRM_ADMIN_PASSWORD: ${CRM_ADMIN_PASSWORD:?Set CRM_ADMIN_PASSWORD in infra/.env}
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+    ports:
+      - "${HOST_BIND_ADDRESS:-127.0.0.1}:${CRM_API_PORT:-4000}:4000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:4000/v1/health').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+  crm-frontend:
+    build:
+      context: ../apps/crm-frontend
+      args:
+        VITE_CRM_API_URL: ${CRM_PUBLIC_API_URL:?Set CRM_PUBLIC_API_URL in infra/.env}
+    container_name: homo-crm-frontend
+    restart: unless-stopped
+    depends_on:
+      crm-backend:
+        condition: service_healthy
+      web-frontend:
+        condition: service_started
+    ports:
+      - "${HOST_BIND_ADDRESS:-127.0.0.1}:${CRM_FRONTEND_PORT:-8100}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  # Transitional web service: it preserves the current Next.js website and
+  # its route handlers while the dedicated web-backend is developed separately.
+  web-frontend:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_SITE_URL: ${WEB_PUBLIC_URL:?Set WEB_PUBLIC_URL in infra/.env}
+    container_name: homo-web-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_SITE_URL: ${WEB_PUBLIC_URL:?Set WEB_PUBLIC_URL in infra/.env}
+      ADMIN_USERNAME: ${WEB_ADMIN_USERNAME:?Set WEB_ADMIN_USERNAME in infra/.env}
+      ADMIN_PASSWORD: ${WEB_ADMIN_PASSWORD:?Set WEB_ADMIN_PASSWORD in infra/.env}
+      ADMIN_SESSION_SECRET: ${WEB_ADMIN_SESSION_SECRET:?Set WEB_ADMIN_SESSION_SECRET in infra/.env}
+    ports:
+      - "${HOST_BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-3000}:3000"
+    volumes:
+      - homo_web_data:/app/data
+      - homo_web_product_images:/app/public/products
+      - homo_web_project_images:/app/public/projects
+      - homo_web_uploads:/app/uploads
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  homo_mongo_data:
+  homo_redis_data:
+  homo_web_data:
+  homo_web_product_images:
+  homo_web_project_images:
+  homo_web_uploads:

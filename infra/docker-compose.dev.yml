@@ -1,0 +1,38 @@
+services:
+  mongo-dev:
+    image: mongo:8.0
+    container_name: homo-mongo-dev
+    hostname: mongo-dev
+    restart: unless-stopped
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "127.0.0.1:${MONGO_DEV_PORT:-27020}:27017"
+    volumes:
+      - homo_mongo_dev_data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok' | grep -q 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+
+  mongo-dev-init:
+    image: mongo:8.0
+    container_name: homo-mongo-dev-init
+    restart: "no"
+    depends_on:
+      mongo-dev:
+        condition: service_healthy
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        if mongosh --host mongo-dev --quiet --eval 'rs.status().ok' >/dev/null 2>&1; then
+          echo "Replica set rs0 is already initialized."
+        else
+          mongosh --host mongo-dev --quiet --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"mongo-dev:27017"}]})'
+        fi
+        until mongosh --host mongo-dev --quiet --eval 'db.hello().isWritablePrimary' | grep -q true; do sleep 1; done
+
+volumes:
+  homo_mongo_dev_data:

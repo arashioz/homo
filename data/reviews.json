@@ -1,0 +1,12 @@
+{
+  "reviews": [
+    {
+      "id": "rev-mtdlfjmi",
+      "productId": 11,
+      "name": "خری",
+      "rating": 5,
+      "text": "ریششسیشسی",
+      "createdAt": "2026-08-28T23:39:15.354Z"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+# Keep Docker build contexts small and avoid baking local state or credentials
+# into the website image. Runtime data is persisted through named volumes.
+.git
+.gitignore
+.next
+node_modules
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+.env
+.env.*
+!.env.example
+coverage
+uploads
+*.log
+.DS_Store
+docs
+*.pdf
+catalog-raw.txt
+scripts/__pycache__
+
