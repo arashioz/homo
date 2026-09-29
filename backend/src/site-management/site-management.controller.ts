@@ -21,4 +21,18 @@ export class SiteManagementController {
   @Put("settings") @RequirePermissions("site.manage") async updateSettings(@Body() body: Partial<SiteSettings>) { return { success: true, data: await this.settings.findOneAndUpdate({ key: "shop" }, body, { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true }) }; }
   @Get("orders") @RequirePermissions("site.manage") async listOrders() { return { success: true, data: await this.orders.find().sort({ orderedAt: -1 }).lean() }; }
   @Patch("orders/:id") @RequirePermissions("site.manage") async updateOrder(@Param("id") id: string, @Body() body: Pick<SiteOrder, "status">) { const data = await this.orders.findByIdAndUpdate(id, { status: body.status }, { new: true, runValidators: true }); if (!data) throw new NotFoundException("سفارش پیدا نشد"); return { success: true, data }; }
+  @Post("import-products") @RequirePermissions("site.manage") async importProducts(@Body() body: { products?: Array<Partial<SiteProduct> & { legacyId: number }> }) {
+    const products = Array.isArray(body.products) ? body.products : [];
+    if (!products.length) return { success: true, data: { upserted: 0 } };
+    const result = await this.products.bulkWrite(
+      products.map((product) => ({
+        updateOne: {
+          filter: { legacyId: product.legacyId },
+          update: { $set: { ...product, isPublished: product.isPublished ?? true } },
+          upsert: true,
+        },
+      })),
+    );
+    return { success: true, data: { upserted: result.upsertedCount + result.modifiedCount } };
+  }
 }

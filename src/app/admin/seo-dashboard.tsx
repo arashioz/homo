@@ -115,7 +115,7 @@ const TABS: Array<{ id: SeoTab; label: string }> = [
   { id: "analyzer", label: "تحلیل تک‌صفحه (Analyzer)" },
 ];
 
-export function AdminSeoDashboard({ user }: { user: SessionUser }) {
+export function AdminSeoDashboard({ user, hideChrome = false }: { user: SessionUser; hideChrome?: boolean }) {
   const router = useRouter();
   const [tab, setTab] = useState<SeoTab>("overview");
   const [dashboard, setDashboard] = useState<SeoDashboardData | null>(null);
@@ -446,8 +446,8 @@ export function AdminSeoDashboard({ user }: { user: SessionUser }) {
   }
 
   return (
-    <div className="admin-app" style={{ minHeight: "100vh" }}>
-      {/* Top Header */}
+    <div className={hideChrome ? undefined : "admin-app"} style={hideChrome ? undefined : { minHeight: "100vh" }}>
+      {!hideChrome && (
       <header className="admin-app-bar">
         <div>
           <p>پنل مدیریت اصلی سایت · HOMO</p>
@@ -462,6 +462,7 @@ export function AdminSeoDashboard({ user }: { user: SessionUser }) {
           </button>
         </div>
       </header>
+      )}
 
       {/* Main Body */}
       <div className="admin-app-body">

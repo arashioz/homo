@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getCatalog } from "@/lib/products";
-import { getGuides } from "@/lib/guides";
+import { getPublishedGuides } from "@/lib/guides";
 import { SiteNav } from "@/components/SiteNav";
 import { HeroIntro } from "@/components/HeroIntro";
 import { CategoriesSection } from "@/components/CategoriesSection";
@@ -42,7 +42,7 @@ export const metadata: Metadata = {
 
 export default async function Home() {
   const catalog = await getCatalog();
-  const guides = await getGuides();
+  const guides = await getPublishedGuides();
   const { products } = catalog;
   const categories = sortCategoriesBySitePriority(getCategories(products))
     .slice(0, 10)

@@ -20,6 +20,11 @@ export async function getGuides(): Promise<Guide[]> {
   return data.guides ?? [];
 }
 
+export async function getPublishedGuides(): Promise<Guide[]> {
+  const guides = await getGuides();
+  return guides.filter((guide) => guide.status !== "draft");
+}
+
 export async function getGuide(id: string): Promise<Guide | null> {
   const guides = await getGuides();
   return guides.find((g) => g.id === id) ?? null;

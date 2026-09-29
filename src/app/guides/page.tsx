@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { getGuides } from "@/lib/guides";
+import { getPublishedGuides } from "@/lib/guides";
 import { SiteNav } from "@/components/SiteNav";
 import { QuietBanner } from "@/components/QuietBanner";
 
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 export default async function GuidesPage() {
-  const guides = await getGuides();
+  const guides = await getPublishedGuides();
 
   return (
     <main>

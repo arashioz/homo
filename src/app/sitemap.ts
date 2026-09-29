@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next";
 import { getCatalog } from "@/lib/products";
-import { getGuides } from "@/lib/guides";
+import { getPublishedGuides } from "@/lib/guides";
 
 const SITE = process.env.NEXT_PUBLIC_SITE_URL || "https://homo.ir";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [catalog, guides] = await Promise.all([getCatalog(), getGuides()]);
+  const [catalog, guides] = await Promise.all([getCatalog(), getPublishedGuides()]);
   const now = new Date();
 
   return [

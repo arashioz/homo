@@ -17,14 +17,17 @@ async function publicApi<T>(endpoint: string): Promise<T> {
 }
 function toProduct(product: ApiProduct): Product { return { ...product, id: product.legacyId }; }
 
+export async function getLocalCatalog(): Promise<Catalog> {
+  const raw = await fs.readFile(PRODUCTS_PATH, "utf8");
+  return JSON.parse(raw) as Catalog;
+}
+
 export async function getCatalog(): Promise<Catalog> {
   try {
     const products = (await publicApi<ApiProduct[]>("/public/site/products")).map(toProduct);
     return { products, meta: { brand: "هومو", tagline: "خانه هوشمند هومو", catalogCode: "CRM", contactPhone: "09356545158", contactName: "هومو", productCount: products.length, imageCount: products.filter((p) => p.image).length, updatedAt: new Date().toISOString() } };
   } catch {
-    // Transitional fallback: remove after the production seed has run.
-    const raw = await fs.readFile(PRODUCTS_PATH, "utf8");
-    return JSON.parse(raw) as Catalog;
+    return getLocalCatalog();
   }
 }
 
@@ -39,16 +42,22 @@ export async function getProduct(id: number): Promise<Product | null> {
   try { const product = await publicApi<ApiProduct | null>(`/public/site/products/${id}`); return product ? toProduct(product) : null; } catch { const catalog = await getCatalog(); return catalog.products.find((p) => p.id === id) ?? null; }
 }
 
+export async function getLocalProjects(): Promise<Project[]> {
+  try {
+    const raw = await fs.readFile(PROJECTS_PATH, "utf8");
+    const data = JSON.parse(raw) as { projects: Project[] };
+    return data.projects ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export async function getProjects(): Promise<Project[]> {
   try {
     const projects = await publicApi<(Omit<Project, "id"> & { legacyId: string })[]>("/public/site/projects");
     return projects.map(({ legacyId, ...project }) => ({ ...project, id: legacyId }));
   } catch {
-    try {
-    const raw = await fs.readFile(PROJECTS_PATH, "utf8");
-    const data = JSON.parse(raw) as { projects: Project[] };
-    return data.projects ?? [];
-    } catch { return []; }
+    return getLocalProjects();
   }
 }
 

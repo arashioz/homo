@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { parseSessionToken, SESSION_COOKIE } from "@/lib/admin-auth";
-import { AdminSeoDashboard } from "./seo-dashboard";
+import { AdminConsole } from "@/components/admin/AdminConsole";
 
 export const dynamic = "force-dynamic";
 
@@ -14,5 +14,5 @@ export default async function AdminPage() {
     redirect("/admin/login");
   }
 
-  return <AdminSeoDashboard user={user} />;
+  return <AdminConsole user={user} />;
 }
