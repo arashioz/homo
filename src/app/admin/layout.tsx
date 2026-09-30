@@ -6,9 +6,5 @@ export const metadata: Metadata = {
 };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="admin-root-wrapper" style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      {children}
-    </div>
-  );
+  return children;
 }

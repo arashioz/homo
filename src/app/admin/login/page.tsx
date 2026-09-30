@@ -15,11 +15,11 @@ export default async function AdminLoginPage() {
   }
 
   return (
-    <main className="admin-page admin-login-mobile">
-      <div className="admin-card">
-        <span className="admin-badge">مدیریت هومو</span>
-        <h1>ورود به پنل مدیریت وب‌سایت</h1>
-        <p>برای دسترسی به ابزارهای هوش مصنوعی (AI SEO Agent) و مدیریت سایت وارد شوید.</p>
+    <main className="cms-login">
+      <div className="cms-login-card">
+        <p>پنل مدیریت وب‌سایت هومو</p>
+        <h1>ورود</h1>
+        <p className="cms-login-lead">برای مدیریت محصولات، مقاله‌ها و سئو وارد شوید.</p>
         <AdminLoginForm />
       </div>
     </main>

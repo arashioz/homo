@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLocalCatalog, saveCatalog } from "@/lib/products";
-import { publishCatalogToBackend, requireAdmin } from "@/lib/admin-api";
+import { publishProductToBackend, requireAdmin } from "@/lib/admin-api";
 import { normalizeCategory } from "@/lib/catalog-taxonomy";
 
 export const runtime = "nodejs";
@@ -31,7 +31,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     features: Array.isArray(body.features) ? body.features.map(String) : current.features,
   };
   await saveCatalog(catalog);
-  const publish = await publishCatalogToBackend(req).catch((err: Error) => ({ published: false, reason: err.message }));
+  const publish = await publishProductToBackend(req, catalog.products[index]).catch((err: Error) => ({ published: false, reason: err.message }));
   return NextResponse.json({ ok: true, product: catalog.products[index], publish });
 }
 

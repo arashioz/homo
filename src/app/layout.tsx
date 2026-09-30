@@ -9,14 +9,17 @@ import "@fontsource/cormorant-garamond/500.css";
 import "@fontsource/cormorant-garamond/600.css";
 import "@fontsource/cormorant-garamond/700.css";
 import "./globals.css";
-import { CartProvider } from "@/lib/cart";
-import { CartUI } from "@/components/CartUI";
-import { SiteFooter } from "@/components/SiteFooter";
-import { PhoneSupport } from "@/components/PhoneSupport";
+import { SiteChrome } from "@/components/SiteChrome";
 import { siteMetadata } from "@/lib/seo";
-import { SiteAnalyticsTracker } from "@/components/SiteAnalyticsTracker";
+import { getSeoSettings } from "@/lib/seo-settings";
 
-export const metadata: Metadata = siteMetadata;
+export async function generateMetadata(): Promise<Metadata> {
+  const seo = await getSeoSettings();
+  return {
+    ...siteMetadata,
+    verification: seo.googleVerification ? { google: seo.googleVerification } : undefined,
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#f5f5f7",
@@ -30,13 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className="h-full antialiased"
     >
       <body className="min-h-full flex flex-col">
-        <SiteAnalyticsTracker />
-        <CartProvider>
-          {children}
-          <PhoneSupport />
-          <CartUI />
-          <SiteFooter />
-        </CartProvider>
+        <SiteChrome>{children}</SiteChrome>
       </body>
     </html>
   );

@@ -69,12 +69,8 @@ export function AdminLoginForm() {
       </label>
 
       <button type="submit" disabled={loading} style={{ marginTop: 12 }}>
-        {loading ? "در حال ورود..." : "ورود به مدیریت"}
+        {loading ? "در حال ورود..." : "ورود"}
       </button>
-
-      <p style={{ marginTop: 14, fontSize: "0.8rem", color: "var(--cream-dim)", textAlign: "center" }}>
-        اطلاعات حساب پیش‌فرض: نام کاربری admin
-      </p>
     </form>
   );
 }

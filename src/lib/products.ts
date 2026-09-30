@@ -5,17 +5,6 @@ import type { Catalog, Product, Project } from "./types";
 const ROOT = process.cwd();
 const PRODUCTS_PATH = path.join(ROOT, "data", "products.json");
 const PROJECTS_PATH = path.join(ROOT, "data", "projects.json");
-const CRM_API_URL = (process.env.CRM_API_URL || "http://127.0.0.1:4000/v1").replace(/\/$/, "");
-
-type ApiProduct = Omit<Product, "id"> & { legacyId: number };
-async function publicApi<T>(endpoint: string): Promise<T> {
-  const response = await fetch(`${CRM_API_URL}${endpoint}`, { cache: "no-store" });
-  if (!response.ok) throw new Error(`CRM public API failed: ${response.status}`);
-  const payload = await response.json() as { success?: boolean; data?: T };
-  if (!payload.success || payload.data === undefined) throw new Error("CRM public API response is invalid");
-  return payload.data;
-}
-function toProduct(product: ApiProduct): Product { return { ...product, id: product.legacyId }; }
 
 export async function getLocalCatalog(): Promise<Catalog> {
   const raw = await fs.readFile(PRODUCTS_PATH, "utf8");
@@ -23,12 +12,7 @@ export async function getLocalCatalog(): Promise<Catalog> {
 }
 
 export async function getCatalog(): Promise<Catalog> {
-  try {
-    const products = (await publicApi<ApiProduct[]>("/public/site/products")).map(toProduct);
-    return { products, meta: { brand: "هومو", tagline: "خانه هوشمند هومو", catalogCode: "CRM", contactPhone: "09356545158", contactName: "هومو", productCount: products.length, imageCount: products.filter((p) => p.image).length, updatedAt: new Date().toISOString() } };
-  } catch {
-    return getLocalCatalog();
-  }
+  return getLocalCatalog();
 }
 
 export async function saveCatalog(catalog: Catalog): Promise<void> {
@@ -39,7 +23,8 @@ export async function saveCatalog(catalog: Catalog): Promise<void> {
 }
 
 export async function getProduct(id: number): Promise<Product | null> {
-  try { const product = await publicApi<ApiProduct | null>(`/public/site/products/${id}`); return product ? toProduct(product) : null; } catch { const catalog = await getCatalog(); return catalog.products.find((p) => p.id === id) ?? null; }
+  const catalog = await getLocalCatalog();
+  return catalog.products.find((p) => p.id === id) ?? null;
 }
 
 export async function getLocalProjects(): Promise<Project[]> {
@@ -53,12 +38,7 @@ export async function getLocalProjects(): Promise<Project[]> {
 }
 
 export async function getProjects(): Promise<Project[]> {
-  try {
-    const projects = await publicApi<(Omit<Project, "id"> & { legacyId: string })[]>("/public/site/projects");
-    return projects.map(({ legacyId, ...project }) => ({ ...project, id: legacyId }));
-  } catch {
-    return getLocalProjects();
-  }
+  return getLocalProjects();
 }
 
 export async function saveProjects(projects: Project[]): Promise<void> {

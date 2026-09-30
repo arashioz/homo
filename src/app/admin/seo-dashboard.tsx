@@ -153,9 +153,7 @@ export function AdminSeoDashboard({ user, hideChrome = false }: { user: SessionU
   );
 
   // GSC State
-  const [gscVerificationCode, setGscVerificationCode] = useState(
-    "google-site-verification=HOMO_SMART_GSC_VERIFY_2026"
-  );
+  const [gscVerificationCode, setGscVerificationCode] = useState("");
   const [gscSaved, setGscSaved] = useState(false);
   const [gscPingStatus, setGscPingStatus] = useState<string | null>(null);
 
@@ -191,11 +189,12 @@ export function AdminSeoDashboard({ user, hideChrome = false }: { user: SessionU
     setLoading(true);
     setError(null);
     try {
-      const [dashRes, pagesRes, promptsRes, settingsRes] = await Promise.all([
+      const [dashRes, pagesRes, promptsRes, settingsRes, seoRes] = await Promise.all([
         fetch("/api/admin/proxy/ai/seo/dashboard").then((r) => r.json()),
         fetch("/api/admin/proxy/ai/seo/pages").then((r) => r.json()),
         fetch("/api/admin/proxy/ai/prompts").then((r) => r.json()),
         fetch("/api/admin/proxy/ai/settings").then((r) => r.json()).catch(() => null),
+        fetch("/api/admin/seo-settings").then((r) => r.json()).catch(() => null),
       ]);
 
       if (dashRes.success) setDashboard(dashRes.data);
@@ -203,6 +202,9 @@ export function AdminSeoDashboard({ user, hideChrome = false }: { user: SessionU
       if (promptsRes.success) setPrompts(promptsRes.data);
       if (settingsRes?.success && settingsRes.data) {
         setAiSettings((prev) => ({ ...prev, ...settingsRes.data }));
+      }
+      if (seoRes?.ok && seoRes.settings?.googleVerification) {
+        setGscVerificationCode(seoRes.settings.googleVerification);
       }
     } catch {
       setError("خطا در بارگذاری اطلاعات سئو از سرور هوش مصنوعی.");
@@ -344,9 +346,32 @@ export function AdminSeoDashboard({ user, hideChrome = false }: { user: SessionU
   }
 
   async function handlePingGsc() {
-    setGscPingStatus("در حال ارسال سیگنال ایندکس نقشه سایت به گوگل...");
-    await new Promise((r) => setTimeout(r, 1200));
-    setGscPingStatus("✅ نقشه سایت (sitemap.xml) با موفقیت به ربات‌های گوگل پینگ شد و در صف خزش قرار گرفت.");
+    setGscPingStatus("در حال ارسال پینگ sitemap به گوگل...");
+    try {
+      const res = await fetch("/api/admin/seo-settings", { method: "POST" }).then((r) => r.json());
+      setGscPingStatus(res.message || res.error || "پینگ ارسال شد");
+    } catch {
+      setGscPingStatus("پینگ گوگل انجام نشد. sitemap در /sitemap.xml فعال است.");
+    }
+  }
+
+  async function saveGscVerification() {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/seo-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ googleVerification: gscVerificationCode }),
+      }).then((r) => r.json());
+      if (!res.ok) throw new Error(res.error || "ذخیره نشد");
+      setGscVerificationCode(res.settings.googleVerification);
+      setGscSaved(true);
+      setTimeout(() => setGscSaved(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "ذخیره تاییدیه گوگل ناموفق بود");
+    } finally {
+      setBusy(false);
+    }
   }
 
   useEffect(() => {
@@ -869,7 +894,7 @@ export function AdminSeoDashboard({ user, hideChrome = false }: { user: SessionU
                   <span style={{ fontSize: "0.8rem", fontWeight: 800, color: "#d97706" }}>GOOGLE SEARCH CONSOLE HUB</span>
                   <h2 style={{ margin: "4px 0 6px", fontSize: "1.3rem" }}>داشبورد اتصال و وضعیت گوگل سرچ کنسول</h2>
                   <p style={{ margin: "0 0 16px", fontSize: "0.85rem", color: "#64748b" }}>
-                    پایش نقشه سایت، متاتگ تاییدیه، کلمات کلیدی هدف و برنامه‌ریزی برای کسب رتبه ۱ گوگل در کلمات هوشمندسازی.
+                    نقشه سایت و robots.txt فعال‌اند. کد تاییدیه Search Console را اینجا بگذارید تا در هدر سایت منتشر شود. آمار کلیک و رتبه داخل خود گوگل سرچ کنسول دیده می‌شود؛ این پنل اتصال مالکیت و پینگ sitemap است.
                   </p>
 
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
@@ -884,10 +909,10 @@ export function AdminSeoDashboard({ user, hideChrome = false }: { user: SessionU
                       />
                       <button
                         type="button"
-                        onClick={() => { setGscSaved(true); setTimeout(() => setGscSaved(false), 3000); }}
+                        onClick={() => void saveGscVerification()}
                         style={{ padding: "6px 14px", borderRadius: 8, background: "#111", color: "#fff", border: 0, fontSize: "0.8rem", cursor: "pointer" }}
                       >
-                        {gscSaved ? "✓ ذخیره شد در هدر سایت" : "ثبت متاتگ تاییدیه"}
+                        {gscSaved ? "در هدر سایت ذخیره شد" : "ثبت متاتگ تاییدیه گوگل"}
                       </button>
 
                       <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--line)", fontSize: "0.82rem" }}>

@@ -61,12 +61,6 @@ export function SiteNav() {
               pathname.startsWith("/products") ? "bg-black/[0.08] text-black font-bold" : "text-[#1d1d1f] hover:bg-black/5"
             }`}
             href="/products"
-            onClick={(e) => {
-              if (pathname === "/") {
-                e.preventDefault();
-                window.dispatchEvent(new CustomEvent("homo:open-shop-sheet"));
-              }
-            }}
           >
             فروشگاه
           </Link>

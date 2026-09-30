@@ -32,30 +32,30 @@ export function AdminConsole({ user }: { user: SessionUser }) {
   }
 
   return (
-    <div className="admin-app" style={{ minHeight: "100vh" }}>
-      <header className="admin-app-bar">
+    <div className="cms-app">
+      <header className="cms-top">
         <div>
-          <p>پنل مدیریت اصلی سایت · HOMO</p>
-          <h1>مدیریت فروشگاه، مقاله و آپدیت کاتالوگ</h1>
+          <p>مدیریت وب‌سایت</p>
+          <h1>هومو</h1>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: "0.85rem", color: "var(--cream-dim)" }}>
-            کاربر: <b>{user.name}</b>
-          </span>
-          <button type="button" className="admin-app-logout" onClick={() => void logout()}>
+        <div className="cms-top-actions">
+          <span>{user.name}</span>
+          <button type="button" onClick={() => void logout()}>
             خروج
           </button>
         </div>
       </header>
-      <div className="admin-app-body">
-        <div className="admin-tabs admin-tabs-scroll">
+      <div className="cms-layout">
+        <nav className="cms-side" aria-label="بخش‌های مدیریت">
           {AREAS.map((item) => (
-            <button key={item.id} type="button" className={area === item.id ? "active" : ""} onClick={() => setArea(item.id)}>
+            <button key={item.id} type="button" className={area === item.id ? "is-active" : ""} onClick={() => setArea(item.id)}>
               {item.label}
             </button>
           ))}
+        </nav>
+        <div className="cms-main">
+          {area === "seo" ? <AdminSeoDashboard user={user} hideChrome /> : <AdminSitePanel area={area} />}
         </div>
-        {area === "seo" ? <AdminSeoDashboard user={user} hideChrome /> : <AdminSitePanel area={area} />}
       </div>
     </div>
   );
@@ -73,6 +73,14 @@ function AdminSitePanel({ area }: { area: Exclude<Area, "seo"> }) {
   const [orders, setOrders] = useState<ShopOrder[]>([]);
   const [settings, setSettings] = useState<ShopSettings | null>(null);
   const [cron, setCron] = useState<Record<string, unknown> | null>(null);
+  const [saveria, setSaveria] = useState<{
+    running?: boolean;
+    lastLog?: string | null;
+    lastError?: string | null;
+    lastSummary?: string | null;
+  } | null>(null);
+  const [visibleCount, setVisibleCount] = useState(40);
+  const [creating, setCreating] = useState(false);
 
   const products = catalog?.products ?? [];
   const selected = products.find((product) => product.id === selectedId) ?? null;
@@ -80,13 +88,14 @@ function AdminSitePanel({ area }: { area: Exclude<Area, "seo"> }) {
   const cats = useMemo(() => categoryOptions(products.map((product) => product.category)), [products]);
 
   const load = useCallback(async () => {
-    const [productsRes, guidesRes, projectsRes, ordersRes, settingsRes, cronRes] = await Promise.all([
+    const [productsRes, guidesRes, projectsRes, ordersRes, settingsRes, cronRes, saveriaRes] = await Promise.all([
       fetch("/api/admin/products").then((res) => res.json()),
       fetch("/api/admin/guides").then((res) => res.json()),
       fetch("/api/admin/projects").then((res) => res.json()),
       fetch("/api/admin/orders").then((res) => res.json()),
       fetch("/api/admin/shop-settings").then((res) => res.json()),
       fetch("/api/admin/catalog-cron").then((res) => res.json()),
+      fetch("/api/admin/sync-saveria").then((res) => res.json()),
     ]);
     if (productsRes.ok) setCatalog(productsRes.catalog);
     if (guidesRes.ok) setGuides(guidesRes.guides);
@@ -94,11 +103,28 @@ function AdminSitePanel({ area }: { area: Exclude<Area, "seo"> }) {
     if (ordersRes.ok) setOrders(ordersRes.orders);
     if (settingsRes.ok) setSettings(settingsRes.settings);
     if (cronRes.ok) setCron(cronRes.status);
+    if (saveriaRes.ok) setSaveria(saveriaRes.status);
   }, []);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (area !== "sync" && !saveria?.running) return;
+    const timer = window.setInterval(() => {
+      void fetch("/api/admin/sync-saveria")
+        .then((res) => res.json())
+        .then((data) => {
+          if (!data.ok) return;
+          setSaveria((prev) => {
+            if (prev?.running && !data.status.running) void load();
+            return data.status;
+          });
+        });
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [area, saveria?.running]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -118,7 +144,7 @@ function AdminSitePanel({ area }: { area: Exclude<Area, "seo"> }) {
       const res = await fetch(url, init);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "خطا");
-      setMessage(data.publish?.published === false ? `ذخیره شد. انتشار زنده: ${data.publish.reason}` : "ذخیره شد");
+      setMessage(data.message || (data.publish?.published === false ? `ذخیره شد. انتشار CRM: ${data.publish.reason}` : "ذخیره شد"));
       await load();
       return data;
     } catch (err) {
@@ -130,73 +156,110 @@ function AdminSitePanel({ area }: { area: Exclude<Area, "seo"> }) {
   }
 
   if (area === "products") {
+    const editing = creating ? null : selected;
     return (
-      <div className="admin-split">
+      <div className="cms-products">
         <section className="admin-panel">
           <div className="admin-panel-head">
-            <h2>کاتالوگ ({products.length.toLocaleString("fa-IR")})</h2>
+            <h2>محصولات فروشگاه ({products.length.toLocaleString("fa-IR")})</h2>
             <button
               type="button"
               disabled={busy}
-              onClick={() =>
-                void jsonFetch("/api/admin/products", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ title: "محصول جدید", specs: "توضیح کوتاه محصول", category: "سایر" }),
-                }).then((data) => data?.product && setSelectedId(data.product.id))
-              }
+              onClick={() => {
+                setCreating(true);
+                setSelectedId(null);
+              }}
             >
-              محصول جدید
+              افزودن محصول
             </button>
           </div>
           <input className="admin-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="جستجو در نام، کد یا دسته" />
-          {message && <p>{message}</p>}
-          <div className="admin-product-grid">
-            {filtered.slice(0, 80).map((product) => (
+          {message && <p className="cms-note">{message}</p>}
+          <div className="admin-product-list">
+            {filtered.slice(0, visibleCount).map((product) => (
               <button
                 key={product.id}
                 type="button"
-                className={`admin-product-card ${selectedId === product.id ? "active" : ""}`}
-                onClick={() => setSelectedId(product.id)}
+                className={`admin-product-row ${selectedId === product.id && !creating ? "active" : ""}`}
+                onClick={() => {
+                  setCreating(false);
+                  setSelectedId(product.id);
+                }}
               >
-                <div className="admin-product-card-media">
-                  {product.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={product.image} alt="" />
-                  ) : (
-                    <span className="admin-thumb-empty" />
-                  )}
-                </div>
-                <div className="admin-product-card-body">
+                {product.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={product.image} alt="" />
+                ) : (
+                  <span className="admin-thumb-empty" />
+                )}
+                <div className="admin-product-meta">
                   <strong>{product.title}</strong>
-                  <span className="admin-product-card-cat">{product.category}</span>
-                  <span className="admin-product-card-price">{formatPrice(product.price, product.priceLabel)}</span>
+                  <span>
+                    کد {product.id} · {product.category} · {formatPrice(product.price, product.priceLabel)}
+                  </span>
                 </div>
+                <span>ویرایش</span>
               </button>
             ))}
           </div>
+          {filtered.length > visibleCount && (
+            <button type="button" className="shop-sheet-more" onClick={() => setVisibleCount((count) => count + 40)}>
+              نمایش محصولات بیشتر
+            </button>
+          )}
         </section>
         <section className="admin-panel">
-          <h2>ویرایش محصول</h2>
-          {selected ? (
+          <h2>{creating ? "افزودن محصول جدید" : editing ? "ویرایش محصول" : "محصول را انتخاب کنید"}</h2>
+          {creating ? (
             <ProductEditor
-              key={selected.id}
-              product={selected}
+              key="create"
+              product={{
+                id: 0,
+                title: "",
+                specs: "",
+                price: null,
+                priceLabel: null,
+                category: cats[0] || "سایر",
+                protocol: null,
+                colors: ["سفید", "مشکی"],
+              }}
               categories={cats}
               busy={busy}
-              onSave={(body) => void jsonFetch(`/api/admin/products/${selected.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })}
+              submitLabel="ثبت محصول"
+              onSave={(body) =>
+                void jsonFetch("/api/admin/products", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(body),
+                }).then((data) => {
+                  if (!data?.product) return;
+                  setCreating(false);
+                  setSelectedId(data.product.id);
+                })
+              }
+              onDelete={() => setCreating(false)}
+              onUpload={async () => undefined}
+            />
+          ) : editing ? (
+            <ProductEditor
+              key={editing.id}
+              product={editing}
+              categories={cats}
+              busy={busy}
+              submitLabel="ذخیره تغییرات"
+              onSave={(body) => void jsonFetch(`/api/admin/products/${editing.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })}
               onDelete={() =>
-                void jsonFetch(`/api/admin/products/${selected.id}`, { method: "DELETE" }).then(() => setSelectedId(null))
+                void jsonFetch(`/api/admin/products/${editing.id}`, { method: "DELETE" }).then(() => setSelectedId(null))
               }
               onUpload={async (file) => {
                 const form = new FormData();
                 form.set("file", file);
-                form.set("productId", String(selected.id));
+                form.set("productId", String(editing.id));
                 await jsonFetch("/api/admin/upload", { method: "POST", body: form });
               }}
             />
           ) : (
-            <p>یک محصول را از لیست انتخاب کنید.</p>
+            <p>برای ویرایش یک محصول را از لیست بزنید، یا «افزودن محصول» را انتخاب کنید.</p>
           )}
         </section>
       </div>
@@ -381,11 +444,19 @@ function AdminSitePanel({ area }: { area: Exclude<Area, "seo"> }) {
     <div className="admin-split">
       <section className="admin-panel">
         <h2>آپدیت از سایت مادر</h2>
-        <p>کاتالوگ از Saveria گرفته می‌شود، تصویرها هم‌خوان می‌شوند و اگر بک‌اند بالا باشد روی فروشگاه زنده هم منتشر می‌شود.</p>
-        {message && <p>{message}</p>}
-        <button type="button" disabled={busy} onClick={() => void jsonFetch("/api/admin/sync-saveria", { method: "POST" })}>
-          همگام‌سازی الان
+        <p>قیمت، عنوان و تصویر محصولات را از Saveria می‌گیرد و در کاتالوگ همین سایت ذخیره می‌کند. این کار چند دقیقه طول می‌کشد.</p>
+        {message && <p className="cms-note">{message}</p>}
+        <button
+          type="button"
+          disabled={busy || Boolean(saveria?.running)}
+          onClick={() => void jsonFetch("/api/admin/sync-saveria", { method: "POST" })}
+        >
+          {saveria?.running ? "در حال همگام‌سازی..." : "همگام‌سازی الان"}
         </button>
+        {saveria?.running && <p>در حال اجرا. صفحه را نبندید؛ وضعیت پایین به‌روز می‌شود.</p>}
+        {saveria?.lastSummary && <p className="cms-note">{saveria.lastSummary}</p>}
+        {saveria?.lastError && <p className="admin-err">{saveria.lastError}</p>}
+        {saveria?.lastLog && <pre className="cms-log">{saveria.lastLog}</pre>}
       </section>
       <section className="admin-panel">
         <h2>آپدیت زنده از فایل کاتالوگ</h2>
@@ -436,6 +507,7 @@ function ProductEditor({
   product,
   categories,
   busy,
+  submitLabel,
   onSave,
   onDelete,
   onUpload,
@@ -443,13 +515,16 @@ function ProductEditor({
   product: Product;
   categories: string[];
   busy: boolean;
+  submitLabel: string;
   onSave: (body: Record<string, unknown>) => void;
   onDelete: () => void;
   onUpload: (file: File) => Promise<void>;
 }) {
+  const isNew = product.id === 0;
   const [title, setTitle] = useState(product.title);
   const [category, setCategory] = useState(product.category);
   const [specs, setSpecs] = useState(product.specs);
+  const [description, setDescription] = useState(product.description || "");
   const [price, setPrice] = useState(product.price == null ? "" : String(product.price));
   const [priceLabel, setPriceLabel] = useState(product.priceLabel || "");
   const [protocol, setProtocol] = useState(product.protocol || "");
@@ -464,6 +539,7 @@ function ProductEditor({
           title,
           category,
           specs,
+          description,
           price: price === "" ? null : Number(price),
           priceLabel,
           protocol,
@@ -476,7 +552,7 @@ function ProductEditor({
     >
       <label>
         عنوان
-        <input value={title} onChange={(e) => setTitle(e.target.value)} />
+        <input value={title} onChange={(e) => setTitle(e.target.value)} required />
       </label>
       <label>
         دسته
@@ -490,7 +566,11 @@ function ProductEditor({
       </label>
       <label>
         مشخصات
-        <textarea value={specs} onChange={(e) => setSpecs(e.target.value)} rows={4} />
+        <textarea value={specs} onChange={(e) => setSpecs(e.target.value)} rows={4} required />
+      </label>
+      <label>
+        توضیح
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
       </label>
       <div className="admin-form-inline">
         <label>
@@ -510,23 +590,25 @@ function ProductEditor({
         رنگ‌ها
         <input value={colors} onChange={(e) => setColors(e.target.value)} placeholder="سفید، مشکی" />
       </label>
-      <label className="file-label">
-        تصویر محصول
-        <input
-          type="file"
-          accept="image/*"
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) void onUpload(file);
-          }}
-        />
-      </label>
+      {!isNew && (
+        <label className="file-label">
+          تصویر محصول
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void onUpload(file);
+            }}
+          />
+        </label>
+      )}
       <div className="admin-row-actions">
         <button type="submit" disabled={busy}>
-          ذخیره محصول
+          {submitLabel}
         </button>
-        <button type="button" className="danger" disabled={busy} onClick={onDelete}>
-          حذف
+        <button type="button" className={isNew ? "" : "danger"} disabled={busy} onClick={onDelete}>
+          {isNew ? "انصراف" : "حذف"}
         </button>
       </div>
     </form>

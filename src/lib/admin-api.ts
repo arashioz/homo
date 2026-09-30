@@ -55,21 +55,42 @@ export function toBackendProduct(product: Product) {
   };
 }
 
-export async function publishCatalogToBackend(req: NextRequest) {
+export async function publishProductToBackend(req: NextRequest, product: Product) {
   const jwt = req.cookies.get("homo_backend_jwt")?.value;
   if (!jwt) return { published: false, reason: "بدون توکن بک‌اند" };
-  const catalog = await getLocalCatalog();
   const res = await fetch(`${BACKEND_URL}/site-management/import-products`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${jwt}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ products: catalog.products.map(toBackendProduct) }),
+    body: JSON.stringify({ products: [toBackendProduct(product)] }),
   });
   if (!res.ok) {
     const payload = await res.json().catch(() => null);
     return { published: false, reason: payload?.message || `HTTP ${res.status}` };
+  }
+  return { published: true };
+}
+
+export async function publishCatalogToBackend(req: NextRequest) {
+  const jwt = req.cookies.get("homo_backend_jwt")?.value;
+  if (!jwt) return { published: false, reason: "بدون توکن بک‌اند" };
+  const catalog = await getLocalCatalog();
+  const chunkSize = 80;
+  for (let i = 0; i < catalog.products.length; i += chunkSize) {
+    const res = await fetch(`${BACKEND_URL}/site-management/import-products`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ products: catalog.products.slice(i, i + chunkSize).map(toBackendProduct) }),
+    });
+    if (!res.ok) {
+      const payload = await res.json().catch(() => null);
+      return { published: false, reason: payload?.message || `HTTP ${res.status}` };
+    }
   }
   return { published: true };
 }

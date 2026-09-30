@@ -130,7 +130,7 @@ export function HomeShopMotion({ products = [] }: { products?: Product[] }) {
               </div>
               <div className="shop-sheet-head-actions">
                 <Link href="/products" className="shop-sheet-link" onClick={closeShop}>
-                  صفحه کامل
+                  صفحه کامل فروشگاه
                 </Link>
                 <button type="button" className="shop-sheet-close" onClick={closeShop} aria-label="بستن">
                   بستن
@@ -181,6 +181,9 @@ export function HomeShopMotion({ products = [] }: { products?: Product[] }) {
                   >
                     نمایش همه محصولات
                   </button>
+                  <Link href="/products" className="shop-sheet-full" onClick={closeShop}>
+                    رفتن به صفحه کامل فروشگاه
+                  </Link>
                 </div>
               ) : (
                 <>
@@ -215,6 +218,9 @@ export function HomeShopMotion({ products = [] }: { products?: Product[] }) {
                       نمایش محصولات بیشتر
                     </button>
                   )}
+                  <Link href="/products" className="shop-sheet-full" onClick={closeShop}>
+                    رفتن به صفحه کامل فروشگاه
+                  </Link>
                 </>
               )}
             </div>
