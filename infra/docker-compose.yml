@@ -75,6 +75,14 @@ services:
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in infra/.env}
       CRM_ADMIN_USERNAME: ${CRM_ADMIN_USERNAME:?Set CRM_ADMIN_USERNAME in infra/.env}
       CRM_ADMIN_PASSWORD: ${CRM_ADMIN_PASSWORD:?Set CRM_ADMIN_PASSWORD in infra/.env}
+      CRM_ADMIN_SYNC_PASSWORD: ${CRM_ADMIN_SYNC_PASSWORD:-1}
+      SITE_DATA_DIR: /site-data
+      SITE_PUBLIC_DIR: /site-public
+      SITE_ROOT: /site-root
+    volumes:
+      - homo_web_data:/site-data
+      - homo_web_product_images:/site-public/products
+      - ../scripts:/site-root/scripts:ro
     depends_on:
       mongo-init:
         condition: service_completed_successfully
@@ -92,6 +100,26 @@ services:
       timeout: 5s
       retries: 12
       start_period: 15s
+
+  crm-seed:
+    build:
+      context: ../backend
+    container_name: homo-crm-seed
+    restart: "no"
+    environment:
+      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@mongo:27017/${MONGO_DATABASE}?authSource=admin&replicaSet=rs0
+      CRM_ADMIN_USERNAME: ${CRM_ADMIN_USERNAME:?Set CRM_ADMIN_USERNAME in infra/.env}
+      CRM_ADMIN_PASSWORD: ${CRM_ADMIN_PASSWORD:?Set CRM_ADMIN_PASSWORD in infra/.env}
+      SITE_DATA_DIR: /site-data
+    volumes:
+      - homo_web_data:/site-data:ro
+      - ../data:/app/data:ro
+    depends_on:
+      mongo-init:
+        condition: service_completed_successfully
+      web-frontend:
+        condition: service_healthy
+    command: ["node", "dist/database/seed.js"]
 
   crm-frontend:
     build:
@@ -122,6 +150,7 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_SITE_URL: ${WEB_PUBLIC_URL:?Set WEB_PUBLIC_URL in infra/.env}
+        NEXT_PUBLIC_CRM_URL: ${CRM_PUBLIC_URL:?Set CRM_PUBLIC_URL in infra/.env}
     container_name: homo-web-frontend
     restart: unless-stopped
     environment:
@@ -129,9 +158,8 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       NEXT_PUBLIC_SITE_URL: ${WEB_PUBLIC_URL:?Set WEB_PUBLIC_URL in infra/.env}
-      ADMIN_USERNAME: ${WEB_ADMIN_USERNAME:?Set WEB_ADMIN_USERNAME in infra/.env}
-      ADMIN_PASSWORD: ${WEB_ADMIN_PASSWORD:?Set WEB_ADMIN_PASSWORD in infra/.env}
-      ADMIN_SESSION_SECRET: ${WEB_ADMIN_SESSION_SECRET:?Set WEB_ADMIN_SESSION_SECRET in infra/.env}
+      NEXT_PUBLIC_CRM_URL: ${CRM_PUBLIC_URL:?Set CRM_PUBLIC_URL in infra/.env}
+      CRM_PUBLIC_URL: ${CRM_PUBLIC_URL:?Set CRM_PUBLIC_URL in infra/.env}
     ports:
       - "${HOST_BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-3000}:3000"
     volumes:

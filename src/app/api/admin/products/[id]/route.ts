@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getLocalCatalog, saveCatalog } from "@/lib/products";
-import { publishProductToBackend, requireAdmin } from "@/lib/admin-api";
+import { publishCatalogToBackend, publishProductToBackend, requireAdmin } from "@/lib/admin-api";
 import { normalizeCategory } from "@/lib/catalog-taxonomy";
 
 export const runtime = "nodejs";

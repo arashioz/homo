@@ -50,3 +50,18 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
 
   return payload.data as T;
 }
+
+export async function apiUpload<T>(path: string, token: string, form: FormData): Promise<T> {
+  const headers = new Headers();
+  headers.set("Accept", "application/json");
+  headers.set("Authorization", `Bearer ${token}`);
+  const response = await fetch(`${apiBaseUrl}${path}`, { method: "POST", headers, body: form });
+  const payload: unknown = await response.json().catch(() => undefined);
+  if (!response.ok) {
+    throw new ApiError(responseMessage(payload, "آپلود فایل ناموفق بود."), response.status);
+  }
+  if (!isRecord(payload) || payload.success !== true || !("data" in payload)) {
+    throw new ApiError("پاسخ نامعتبر از سرور دریافت شد.", response.status);
+  }
+  return payload.data as T;
+}

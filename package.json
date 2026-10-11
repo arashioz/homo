@@ -26,7 +26,8 @@
     "dev:all": "npm run db:up && concurrently -k -n \"BACKEND,FRONTEND,CRM\" -c \"blue.bold,green.bold,magenta.bold\" \"npm run backend:dev\" \"npm run dev\" \"npm run crm:frontend:dev\"",
     "stack:up": "docker compose --env-file infra/.env -f infra/docker-compose.yml up --build -d",
     "stack:down": "docker compose --env-file infra/.env -f infra/docker-compose.yml down",
-    "stack:logs": "docker compose --env-file infra/.env -f infra/docker-compose.yml logs -f"
+    "stack:logs": "docker compose --env-file infra/.env -f infra/docker-compose.yml logs -f",
+    "stack:seed": "docker compose --env-file infra/.env -f infra/docker-compose.yml run --rm crm-seed"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "^5.3.0",

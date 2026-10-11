@@ -24,7 +24,9 @@ RUN npm ci --include-workspace-root
 FROM base AS build
 
 ARG NEXT_PUBLIC_SITE_URL
+ARG NEXT_PUBLIC_CRM_URL
 ENV NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
+ENV NEXT_PUBLIC_CRM_URL=${NEXT_PUBLIC_CRM_URL}
 
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .

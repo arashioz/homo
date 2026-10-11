@@ -29,11 +29,21 @@ export class AuthService {
     const username = process.env.CRM_ADMIN_USERNAME?.trim().toLowerCase();
     const password = process.env.CRM_ADMIN_PASSWORD;
     if (!username || !password || password.startsWith("replace-with")) return;
-    const existing = await this.users.exists({ username });
-    if (existing) return;
+    const passwordHash = await bcrypt.hash(password, 12);
+    const existing = await this.users.findOne({ username });
+    if (existing) {
+      if (process.env.CRM_ADMIN_SYNC_PASSWORD === "1") {
+        existing.passwordHash = passwordHash;
+        existing.active = true;
+        existing.roles = ["SUPER_ADMIN"];
+        existing.permissions = ["*"];
+        await existing.save();
+      }
+      return;
+    }
     await this.users.create({
       username,
-      passwordHash: await bcrypt.hash(password, 12),
+      passwordHash,
       fullName: "مدیر سیستم",
       roles: ["SUPER_ADMIN"],
       permissions: ["*"],

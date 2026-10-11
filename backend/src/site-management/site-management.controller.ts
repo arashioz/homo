@@ -1,38 +1,173 @@
-import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Put, UseGuards } from "@nestjs/common";
-import { InjectModel } from "@nestjs/mongoose";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
-import type { Model } from "mongoose";
+import { memoryStorage } from "multer";
 import { JwtAuthGuard } from "../auth/jwt-auth.guard";
 import { PermissionsGuard } from "../auth/permissions.guard";
 import { RequirePermissions } from "../auth/permissions.decorator";
-import { SiteOrder, SitePortfolioProject, SiteProduct, SiteSettings } from "./site.schemas";
+import { SiteJobsService } from "./site-jobs.service";
+import { SiteStoreService } from "./site-store.service";
+import { GuideBodyDto, OrderStatusDto, PortfolioBodyDto, ProductBodyDto, ShopSettingsDto } from "./site.dto";
 
-@ApiTags("site-management") @ApiBearerAuth() @UseGuards(JwtAuthGuard, PermissionsGuard) @Controller("site-management")
+type UploadFile = { buffer: Buffer; originalname: string; size: number };
+
+@ApiTags("site-management")
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, PermissionsGuard)
+@Controller("site-management")
 export class SiteManagementController {
-  constructor(@InjectModel(SiteProduct.name) private readonly products: Model<SiteProduct>, @InjectModel(SitePortfolioProject.name) private readonly projects: Model<SitePortfolioProject>, @InjectModel(SiteSettings.name) private readonly settings: Model<SiteSettings>, @InjectModel(SiteOrder.name) private readonly orders: Model<SiteOrder>) {}
-  @Get("products") @RequirePermissions("site.manage") async listProducts() { return { success: true, data: await this.products.find().sort({ legacyId: 1 }).lean() }; }
-  @Post("products") @RequirePermissions("site.manage") async createProduct(@Body() body: Partial<SiteProduct>) { return { success: true, data: await this.products.create({ ...body, legacyId: body.legacyId ?? Date.now() }) }; }
-  @Patch("products/:id") @RequirePermissions("site.manage") async updateProduct(@Param("id") id: string, @Body() body: Partial<SiteProduct>) { const data = await this.products.findByIdAndUpdate(id, body, { new: true, runValidators: true }); if (!data) throw new NotFoundException("محصول پیدا نشد"); return { success: true, data }; }
-  @Delete("products/:id") @RequirePermissions("site.manage") async deleteProduct(@Param("id") id: string) { const data = await this.products.findByIdAndDelete(id); if (!data) throw new NotFoundException("محصول پیدا نشد"); return { success: true, data: { id } }; }
-  @Get("projects") @RequirePermissions("site.manage") async listProjects() { return { success: true, data: await this.projects.find().sort({ createdAt: -1 }).lean() }; }
-  @Post("projects") @RequirePermissions("site.manage") async createProject(@Body() body: Partial<SitePortfolioProject>) { return { success: true, data: await this.projects.create({ ...body, legacyId: body.legacyId ?? `prj-${Date.now()}` }) }; }
-  @Delete("projects/:id") @RequirePermissions("site.manage") async deleteProject(@Param("id") id: string) { const data = await this.projects.findByIdAndDelete(id); if (!data) throw new NotFoundException("نمونه‌کار پیدا نشد"); return { success: true, data: { id } }; }
-  @Get("settings") @RequirePermissions("site.manage") async getSettings() { return { success: true, data: await this.settings.findOneAndUpdate({ key: "shop" }, {}, { upsert: true, new: true, setDefaultsOnInsert: true }).lean() }; }
-  @Put("settings") @RequirePermissions("site.manage") async updateSettings(@Body() body: Partial<SiteSettings>) { return { success: true, data: await this.settings.findOneAndUpdate({ key: "shop" }, body, { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true }) }; }
-  @Get("orders") @RequirePermissions("site.manage") async listOrders() { return { success: true, data: await this.orders.find().sort({ orderedAt: -1 }).lean() }; }
-  @Patch("orders/:id") @RequirePermissions("site.manage") async updateOrder(@Param("id") id: string, @Body() body: Pick<SiteOrder, "status">) { const data = await this.orders.findByIdAndUpdate(id, { status: body.status }, { new: true, runValidators: true }); if (!data) throw new NotFoundException("سفارش پیدا نشد"); return { success: true, data }; }
-  @Post("import-products") @RequirePermissions("site.manage") async importProducts(@Body() body: { products?: Array<Partial<SiteProduct> & { legacyId: number }> }) {
-    const products = Array.isArray(body.products) ? body.products : [];
-    if (!products.length) return { success: true, data: { upserted: 0 } };
-    const result = await this.products.bulkWrite(
-      products.map((product) => ({
-        updateOne: {
-          filter: { legacyId: product.legacyId },
-          update: { $set: { ...product, isPublished: product.isPublished ?? true } },
-          upsert: true,
-        },
-      })),
-    );
-    return { success: true, data: { upserted: result.upsertedCount + result.modifiedCount } };
+  constructor(
+    private readonly store: SiteStoreService,
+    private readonly jobs: SiteJobsService,
+  ) {}
+
+  @Get("products")
+  @RequirePermissions("site.manage")
+  async listProducts() {
+    return { success: true, data: await this.store.listProducts() };
+  }
+
+  @Post("products")
+  @RequirePermissions("site.manage")
+  async createProduct(@Body() body: ProductBodyDto) {
+    return { success: true, data: await this.store.createProduct(body) };
+  }
+
+  @Patch("products/:id")
+  @RequirePermissions("site.manage")
+  async updateProduct(@Param("id") id: string, @Body() body: ProductBodyDto) {
+    return { success: true, data: await this.store.updateProduct(id, body) };
+  }
+
+  @Delete("products/:id")
+  @RequirePermissions("site.manage")
+  async deleteProduct(@Param("id") id: string) {
+    return { success: true, data: await this.store.deleteProduct(id) };
+  }
+
+  @Post("products/:id/image")
+  @RequirePermissions("site.manage")
+  @UseInterceptors(FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 12 * 1024 * 1024 } }))
+  async uploadProductImage(@Param("id") id: string, @UploadedFile() file?: UploadFile) {
+    if (!file?.buffer) throw new BadRequestException("فایل تصویر لازم است");
+    return { success: true, data: await this.store.saveProductImage(id, file) };
+  }
+
+  @Get("guides")
+  @RequirePermissions("site.manage")
+  async listGuides() {
+    return { success: true, data: await this.store.listGuides() };
+  }
+
+  @Post("guides")
+  @RequirePermissions("site.manage")
+  async createGuide(@Body() body: GuideBodyDto) {
+    return { success: true, data: await this.store.createGuide(body) };
+  }
+
+  @Patch("guides/:id")
+  @RequirePermissions("site.manage")
+  async updateGuide(@Param("id") id: string, @Body() body: GuideBodyDto) {
+    return { success: true, data: await this.store.updateGuide(id, body) };
+  }
+
+  @Delete("guides/:id")
+  @RequirePermissions("site.manage")
+  async deleteGuide(@Param("id") id: string) {
+    return { success: true, data: await this.store.deleteGuide(id) };
+  }
+
+  @Get("projects")
+  @RequirePermissions("site.manage")
+  async listProjects() {
+    return { success: true, data: await this.store.listPortfolio() };
+  }
+
+  @Post("projects")
+  @RequirePermissions("site.manage")
+  async createProject(@Body() body: PortfolioBodyDto) {
+    return { success: true, data: await this.store.createPortfolio(body) };
+  }
+
+  @Delete("projects/:id")
+  @RequirePermissions("site.manage")
+  async deleteProject(@Param("id") id: string) {
+    return { success: true, data: await this.store.deletePortfolio(id) };
+  }
+
+  @Get("settings")
+  @RequirePermissions("site.manage")
+  async getSettings() {
+    return { success: true, data: await this.store.getSettings() };
+  }
+
+  @Put("settings")
+  @RequirePermissions("site.manage")
+  async updateSettings(@Body() body: ShopSettingsDto) {
+    return { success: true, data: await this.store.updateSettings(body) };
+  }
+
+  @Get("orders")
+  @RequirePermissions("site.manage")
+  async listOrders() {
+    return { success: true, data: await this.store.listOrders() };
+  }
+
+  @Patch("orders/:id")
+  @RequirePermissions("site.manage")
+  async updateOrder(@Param("id") id: string, @Body() body: OrderStatusDto) {
+    return { success: true, data: await this.store.updateOrder(id, body) };
+  }
+
+  @Get("sync-saveria")
+  @RequirePermissions("site.manage")
+  saveriaStatus() {
+    return { success: true, data: this.jobs.saveriaStatus() };
+  }
+
+  @Post("sync-saveria")
+  @RequirePermissions("site.manage")
+  startSaveria() {
+    return { success: true, data: this.jobs.startSaveria(), message: "همگام‌سازی شروع شد" };
+  }
+
+  @Get("catalog-cron")
+  @RequirePermissions("site.manage")
+  cronStatus() {
+    return { success: true, data: this.jobs.cronStatus() };
+  }
+
+  @Post("catalog-cron")
+  @RequirePermissions("site.manage")
+  @UseInterceptors(FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 40 * 1024 * 1024 } }))
+  async startCron(
+    @UploadedFile() file?: UploadFile,
+    @Body("intervalMinutes") intervalMinutes?: string,
+    @Body("durationMinutes") durationMinutes?: string,
+  ) {
+    if (!file?.buffer) throw new BadRequestException("فایل کاتالوگ لازم است");
+    return {
+      success: true,
+      data: await this.jobs.startCron(file, Number(intervalMinutes || 30), Number(durationMinutes || 240)),
+    };
+  }
+
+  @Delete("catalog-cron")
+  @RequirePermissions("site.manage")
+  stopCron() {
+    return { success: true, data: this.jobs.stopCron() };
   }
 }
