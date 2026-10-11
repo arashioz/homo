@@ -101,7 +101,7 @@ export function CrmShell({ activePage, onNavigate, user, onLogout, children }: C
           <IonContent className="crm-content" fullscreen>
             <div className="crm-page-content">{children}</div>
           </IonContent>
-          <nav className="mobile-navigation" aria-label="ناوبری گوشی">
+          <nav className="crm-bottom-nav" aria-label="منوی CRM">
             {mobilePrimary.map((item) => (
               <button
                 key={item.id}
@@ -149,35 +149,6 @@ export function CrmShell({ activePage, onNavigate, user, onLogout, children }: C
             </div>
           ) : null}
         </main>
-
-        <aside className="crm-sidebar">
-          <div className="brand-lockup">
-            <div className="brand-symbol"><img src={logoMarkPath} alt="هومو" /></div>
-            <div>
-              <strong>خانه هوشمند</strong>
-              <span>CRM داخلی شرکت</span>
-            </div>
-          </div>
-          <nav className="sidebar-navigation" aria-label="ناوبری اصلی">
-            {navigation.map((item) => (
-              <button
-                key={item.id}
-                className={activePage === item.id ? "active" : ""}
-                onClick={() => onNavigate(item.id)}
-                type="button"
-              >
-                <IonIcon icon={item.icon} />
-                <span>{item.label}</span>
-              </button>
-            ))}
-          </nav>
-          <div className="sidebar-footer">
-            <span>نسخهٔ عملیاتی CRM</span>
-            <button type="button" onClick={onLogout}>
-              <IonIcon icon={logOutOutline} /> خروج
-            </button>
-          </div>
-        </aside>
       </div>
     </IonPage>
   );
