@@ -3,15 +3,22 @@ set -eu
 cd "$(dirname "$0")"
 
 if docker compose version >/dev/null 2>&1; then
-  exec docker compose up --build --detach "$@"
+  COMPOSE="docker compose"
+elif command -v docker-compose >/dev/null 2>&1; then
+  COMPOSE="docker-compose"
+else
+  echo "Docker Compose پیدا نشد. اول افزونه compose را نصب کن."
+  exit 1
 fi
 
-if command -v docker-compose >/dev/null 2>&1; then
-  exec docker-compose up --build -d "$@"
-fi
+# Parallel builds get OOM-killed on small servers, so build one image at a time.
+export COMPOSE_BAKE=false
+export COMPOSE_PARALLEL_LIMIT=1
 
-echo "Docker Compose پیدا نشد. روی سرور این را بزن:"
-echo "  apt-get update && apt-get install -y docker-compose-plugin"
-echo "بعد دوباره:"
-echo "  docker compose up --build --detach"
-exit 1
+for service in crm-backend crm-frontend web-frontend; do
+  echo "==> building $service"
+  $COMPOSE build "$service"
+done
+
+$COMPOSE up --detach "$@"
+$COMPOSE ps
