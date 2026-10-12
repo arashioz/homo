@@ -1,5 +1,6 @@
 # From the repo root:
-#   docker compose up -d
+#   ./up.sh
+# or: docker compose up --build --detach
 # Site :3000 · CRM :8100 · API :4000
 name: homo
 
