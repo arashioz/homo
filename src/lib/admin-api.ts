@@ -9,7 +9,7 @@ const BACKEND_URL = (process.env.CRM_API_URL || "http://127.0.0.1:4000/v1").repl
 export function requireAdmin(req: NextRequest) {
   const user = getSessionUser(req);
   if (!user) {
-    return { user: null as const, error: unauthorizedResponse() };
+    return { user: null, error: unauthorizedResponse() };
   }
   return { user, error: null as NextResponse | null };
 }

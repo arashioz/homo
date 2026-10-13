@@ -1,5 +1,44 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## اجرا با Docker و رم محدود
+
+این پروژه علاوه بر سایت Next.js، بک‌اند NestJS، پنل CRM و MongoDB را اجرا می‌کند.
+مصرف رم هنگام ساخت imageها با مصرف اجرای نسخهٔ آماده متفاوت است؛ اجرای کامل
+روی سرور ۱ گیگابایتی بدون اندازه‌گیری و تست بار تضمین نشده است.
+
+```bash
+# ساخت ترتیبی imageها و اجرا
+./up.sh
+
+# معادل با Docker Compose؛ از ریشهٔ پروژه اجرا شود
+COMPOSE_BAKE=false COMPOSE_PARALLEL_LIMIT=1 docker compose build crm-backend crm-frontend web-frontend
+docker compose up -d --no-build
+
+# اجرای imageهای موجود، بدون ساخت دوباره
+./up.sh --no-build
+
+# مشاهدهٔ مصرف سرویس‌ها و خطاهای راه‌اندازی
+docker stats --no-stream
+docker compose logs --tail=100
+```
+
+برای سرور کم‌رم، imageها را روی دستگاه یا CI با حافظهٔ کافی و معماری CPU سازگار
+با سرور بسازید و از طریق registry یا `docker save` / `docker load` منتقل کنید؛
+سپس `./up.sh --no-build` را اجرا کنید. فایل‌های داده و تصاویرِ mountشده در
+`docker-compose.yml` نیز باید روی سرور موجود باشند. گزینهٔ `--no-build` بدون
+imageهای آماده، نصب اولیه را انجام نمی‌دهد و تغییرات کد را هم build نمی‌کند.
+
+ساخت Next.js به یک worker و یک صفحهٔ هم‌زمان محدود شده و بهینه‌سازی حافظهٔ
+Webpack فعال است؛ این تنظیمات سقف مصرف کل سیستم نیستند. اجرای عادی Docker از
+نسخهٔ production استفاده می‌کند؛ `npm run dev` برای توسعه است.
+
+در image بک‌اند فقط وابستگی‌های workspace بک‌اند نصب می‌شوند. پس از build،
+وابستگی‌های توسعه با `npm prune --omit=dev` حذف می‌شوند و نصب دومی وجود ندارد.
+محدودکردن هم‌زمانی Compose به‌تنهایی اجرای هم‌زمان stageهای مستقل داخل یک
+Dockerfile را متوقف نمی‌کند؛ به همین دلیل مرحلهٔ production بک‌اند به خروجی
+ساخت وابسته است. هشدار `deprecated inflight` به‌تنهایی علت شکست build نیست؛
+برای تشخیص `signal: killed`، لاگ OOM سیستم‌عامل و وضعیت حافظه بررسی شود.
+
 ## Getting Started
 
 First, run the development server:

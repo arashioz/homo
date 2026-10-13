@@ -2,6 +2,12 @@
 set -eu
 cd "$(dirname "$0")"
 
+BUILD=1
+if [ "${1:-}" = "--no-build" ]; then
+  BUILD=0
+  shift
+fi
+
 if docker compose version >/dev/null 2>&1; then
   COMPOSE="docker compose"
 elif command -v docker-compose >/dev/null 2>&1; then
@@ -15,10 +21,14 @@ fi
 export COMPOSE_BAKE=false
 export COMPOSE_PARALLEL_LIMIT=1
 
-for service in crm-backend crm-frontend web-frontend; do
-  echo "==> building $service"
-  $COMPOSE build "$service"
-done
+if [ "$BUILD" = "1" ]; then
+  for service in crm-backend crm-frontend web-frontend; do
+    echo "==> building $service"
+    $COMPOSE build "$service"
+  done
+fi
 
-$COMPOSE up --detach "$@"
+# The seed service shares the backend image; startup must never trigger another
+# build. With --no-build, all application images must already exist locally.
+$COMPOSE up --detach --no-build "$@"
 $COMPOSE ps

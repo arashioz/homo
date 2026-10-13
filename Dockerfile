@@ -18,6 +18,7 @@ FROM base AS dependencies
 # The root package lock must be regenerated whenever a workspace is added.
 # Copy workspace manifests as well, so npm ci resolves the monorepo exactly.
 COPY package.json package-lock.json ./
+COPY backend/package.json ./backend/package.json
 COPY apps ./apps
 RUN npm ci --include-workspace-root
 
@@ -49,9 +50,9 @@ COPY --from=build --chown=homo:homo /app/.next/static ./.next/static
 COPY --from=build --chown=homo:homo /app/public ./public
 COPY --from=build --chown=homo:homo /app/data ./data
 COPY --from=build --chown=homo:homo /app/scripts ./scripts
-COPY --from=build --chown=homo:homo /app/uploads ./uploads
 
-RUN mkdir -p public/products public/projects \
+# Uploads are excluded from the build context and mounted at runtime.
+RUN mkdir -p public/products public/projects uploads \
     && chown -R homo:homo /app
 
 USER homo
