@@ -15,7 +15,13 @@ except ImportError:
     sys.exit(1)
 
 try:
-    import pymupdf as fitz
+    try:
+        import pymupdf as fitz
+    except ModuleNotFoundError as error:
+        if error.name != "pymupdf":
+            raise
+        # Debian Bookworm packages PyMuPDF under its original module name.
+        import fitz
 except ImportError:
     print("Install pymupdf: pip3 install pymupdf", file=sys.stderr)
     sys.exit(1)

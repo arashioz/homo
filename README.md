@@ -39,12 +39,12 @@ Dockerfile را متوقف نمی‌کند؛ به همین دلیل مرحلهٔ
 ساخت وابسته است. هشدار `deprecated inflight` به‌تنهایی علت شکست build نیست؛
 برای تشخیص `signal: killed`، لاگ OOM سیستم‌عامل و وضعیت حافظه بررسی شود.
 
-اگر دانلود Python از `files.pythonhosted.org` با `ReadTimeoutError` روبه‌رو شد،
-مشکل مربوط به اتصال دانلود است. مهلت ارتباط pip در Dockerfile برابر ۱۲۰ ثانیه
-و تعداد retryها ۱۰ تنظیم شده است. مرحلهٔ نصب بسته‌های سیستم‌عامل جداست تا
-پس از شکست دانلود، در تلاش بعدی از کش استفاده شود. در صورت نیاز، مهلت را با
-`docker compose build --build-arg PIP_DOWNLOAD_TIMEOUT=300 web-frontend`
-بیشتر کنید؛ افزایش مهلت، قطع یا مسدودبودن دسترسی به سرویس دانلود را حل نمی‌کند.
+ابزارهای پایتون از مخزن Debian Bookworm با بسته‌های `python3-openpyxl`،
+`python3-pil`، `python3-pypdf` و `python3-fitz` نصب می‌شوند؛ ساخت image دیگر
+برای این ابزارها به PyPI یا `files.pythonhosted.org` متصل نمی‌شود. نسخه‌ها را
+مخزن Debian تعیین می‌کند و با آخرین نسخهٔ PyPI یکسان نیستند. اسکریپت واردکردن
+کاتالوگ، نام ماژول `fitz` در Debian و `pymupdf` در نسخه‌های جدید را پشتیبانی
+می‌کند. دسترسی به مخزن Debian، رجیستری Docker و npm همچنان لازم است.
 
 ## Getting Started
 

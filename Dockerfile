@@ -7,17 +7,13 @@ FROM node:22-bookworm-slim AS base
 ENV NEXT_TELEMETRY_DISABLED=1
 WORKDIR /app
 
+# Use Debian's packaged Python tools so builds do not need PyPI downloads.
+# Bookworm exposes PyMuPDF as `fitz`, supported by import-catalog.py.
 RUN apt-get update \
-    && apt-get install --yes --no-install-recommends python3 python3-pip \
+    && apt-get install --yes --no-install-recommends \
+      python3 python3-openpyxl python3-pil python3-pypdf python3-fitz \
+    && python3 -c "import fitz, openpyxl; from pypdf import PdfReader; from PIL.Image import Resampling" \
     && rm -rf /var/lib/apt/lists/*
-
-# Keep the OS packages cached if a Python download fails on a slow connection.
-ARG PIP_DOWNLOAD_TIMEOUT=120
-ARG PIP_DOWNLOAD_RETRIES=10
-RUN python3 -m pip install --no-cache-dir --break-system-packages \
-      --disable-pip-version-check \
-      --timeout "${PIP_DOWNLOAD_TIMEOUT}" --retries "${PIP_DOWNLOAD_RETRIES}" \
-      openpyxl pillow pypdf pymupdf
 
 FROM base AS dependencies
 
