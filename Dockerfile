@@ -9,9 +9,15 @@ WORKDIR /app
 
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends python3 python3-pip \
-    && python3 -m pip install --no-cache-dir --break-system-packages \
-      openpyxl pillow pypdf pymupdf \
     && rm -rf /var/lib/apt/lists/*
+
+# Keep the OS packages cached if a Python download fails on a slow connection.
+ARG PIP_DOWNLOAD_TIMEOUT=120
+ARG PIP_DOWNLOAD_RETRIES=10
+RUN python3 -m pip install --no-cache-dir --break-system-packages \
+      --disable-pip-version-check \
+      --timeout "${PIP_DOWNLOAD_TIMEOUT}" --retries "${PIP_DOWNLOAD_RETRIES}" \
+      openpyxl pillow pypdf pymupdf
 
 FROM base AS dependencies
 

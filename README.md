@@ -39,6 +39,13 @@ Dockerfile را متوقف نمی‌کند؛ به همین دلیل مرحلهٔ
 ساخت وابسته است. هشدار `deprecated inflight` به‌تنهایی علت شکست build نیست؛
 برای تشخیص `signal: killed`، لاگ OOM سیستم‌عامل و وضعیت حافظه بررسی شود.
 
+اگر دانلود Python از `files.pythonhosted.org` با `ReadTimeoutError` روبه‌رو شد،
+مشکل مربوط به اتصال دانلود است. مهلت ارتباط pip در Dockerfile برابر ۱۲۰ ثانیه
+و تعداد retryها ۱۰ تنظیم شده است. مرحلهٔ نصب بسته‌های سیستم‌عامل جداست تا
+پس از شکست دانلود، در تلاش بعدی از کش استفاده شود. در صورت نیاز، مهلت را با
+`docker compose build --build-arg PIP_DOWNLOAD_TIMEOUT=300 web-frontend`
+بیشتر کنید؛ افزایش مهلت، قطع یا مسدودبودن دسترسی به سرویس دانلود را حل نمی‌کند.
+
 ## Getting Started
 
 First, run the development server:
